@@ -1,6 +1,6 @@
 ---
 name: work-issues
-description: "Work a batch of open GitHub issues in the current repo into PRs, one worktree per branch, with an AI review loop. Pass the issue budget as the argument."
+description: "Work a batch of open GitHub issues in the current repo into PRs, one worktree per branch, with a CodeRabbit review loop. Pass the issue budget as the argument."
 argument-hint: "<max-issues>"
 disable-model-invocation: true
 ---
@@ -41,14 +41,14 @@ When a subagent implements an issue, it sees none of your memory or project note
 
 ## Review loop
 
-Every PR gets an automatic AI review, and catching it is a core part of the run. Bot reviews routinely take longer than 20 minutes, so a polling subagent per PR sees nothing and burns tokens. Instead:
+CodeRabbit is the only reviewer. Every PR gets an automatic CodeRabbit review, and catching it is a core part of the run. Its reviews routinely take longer than 20 minutes, so a polling subagent per PR sees nothing and burns tokens. Instead:
 
-1. **One watcher for the whole run.** As soon as the first PR opens, arm a single `Monitor` over all of your open PRs. Each poll, emit only lines not seen before, deduplicated through a seen-file keyed on the review or comment id: failed checks, submitted reviews, top-level inline comments, and merges. Re-arm it every time it expires until every PR from the run has merged or been handed over.
-2. **Route each finding to the agent that wrote the PR.** `SendMessage` it with the specific findings. It keeps its context, so this is far cheaper than a fresh agent. Its brief: verify each finding; if real, fix it in the worktree with a test that fails when the fix is reverted, push, reply on the thread, resolve it, and re-request review. If wrong or out of scope, reply explaining why and leave the code alone. Report once.
-3. **Read the whole review.** Some bots put "outside diff range" findings only in the review body, with no inline thread, so "0 unresolved threads" can hide a real finding. A bot can also post an approval seconds after posting findings, so an approval is not proof of no findings. Judge by the reviews on the head commit.
+1. **One watcher for the whole run.** As soon as the first PR opens, arm a single `Monitor` over all of your open PRs. Each poll, emit only lines not seen before, deduplicated through a seen-file keyed on the review or comment id: failed checks, CodeRabbit reviews, top-level inline comments, and merges. Re-arm it every time it expires until every PR from the run has merged or been handed over.
+2. **Route each finding to the agent that wrote the PR.** `SendMessage` it with the specific findings. It keeps its context, so this is far cheaper than a fresh agent. Its brief: verify each finding; if real, fix it in the worktree with a test that fails when the fix is reverted, push, reply on the thread, resolve it, and re-request review with `@coderabbitai review`. If wrong or out of scope, reply explaining why and leave the code alone. Report once.
+3. **Read the whole review.** CodeRabbit puts "outside diff range" and nitpick findings only in the review body, with no inline thread, so "0 unresolved threads" can hide a real finding. It can also post an approval seconds after posting findings, so an approval is not proof of no findings. Judge by the reviews on the head commit.
 4. **A failed check is not automatically the PR's fault.** Read the failed job's log before acting (`gh api repos/<o>/<r>/actions/jobs/<id>/logs` works while the run is still going). A cancelled job reruns with `gh run rerun <id> --failed`. A known flaky test fixed on main is solved by merging main into the branch (a merge, never a force-push).
 
-**One valid review per PR.** A review from CodeRabbit or Claude counts, whichever arrives first. CodeRabbit has a small hourly review limit. A rate-limited PR gets a "Review limit reached" comment and is never reviewed later on its own, and a burst of `@coderabbitai review` comments only burns more of the limit. So request reviews one PR at a time. When CodeRabbit answers with its limit, comment `@claude` on that PR asking for a review-only pass against the repo's instructions ("do not push commits; list each defect with file:line, or say there are no blocking issues"). A Claude review is free text: read it for defects before treating the PR as reviewed.
+**Every PR needs a CodeRabbit review on its head commit.** No other reviewer substitutes for it; do not ask `@claude` or any other bot for a review. CodeRabbit has a small hourly review limit. A rate-limited PR gets a "Review limit reached" comment and is never reviewed later on its own, and a burst of `@coderabbitai review` comments only burns more of the limit. So request reviews one PR at a time. When CodeRabbit answers with its limit, note the wait time it gives, and have the watcher post a single `@coderabbitai review` on that PR once the window has passed. Keep a queue of rate-limited PRs and release them one at a time. A PR still unreviewed at the end of the run is listed in the summary as awaiting CodeRabbit.
 
 ## Stop
 
@@ -57,6 +57,7 @@ Done when the budget is spent or no eligible issues remain. Finish with a summar
 - PRs opened: link plus the issue numbers each closes.
 - Issues skipped or blocked, each with its reason.
 - Decisions waiting on the user that agents raised (behaviour changes, data cleanups, settings to confirm).
+- PRs still awaiting a CodeRabbit review (rate-limited or pending).
 - Count of eligible issues left for the next run.
 
 Keep the watcher running after the summary. Reviews on the last PRs usually land after it.
