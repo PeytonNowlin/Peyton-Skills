@@ -1,6 +1,6 @@
 interface:
   display_name: "Work Issues"
-  short_description: "Turn GitHub issues into PRs with Codex review"
+  short_description: "Work issues with automatic Codex code and security reviews"
 
 policy:
   allow_implicit_invocation: false

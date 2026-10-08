@@ -20,7 +20,7 @@ Pull the repo to pick up updates. Symlinked skills update in place.
 
 ### `work-issues`
 
-Works a batch of open GitHub issues into pull requests, then babysits each PR through its Codex review.
+Works a batch of open GitHub issues into pull requests, then babysits each PR through automatic Codex code and security reviews on every push. The skill monitors results without posting review triggers.
 
 ```
 $work-issues 3
@@ -31,7 +31,7 @@ The number is the issue budget for the run. For each issue it:
 1. Fetches the complete issue inventory, picks issues assigned only to you first, then unassigned oldest-first, and verifies ownership as it claims each one.
 2. Creates a fresh `git worktree` off the repository's target branch per branch. Checks all open PRs and reserves files locally before agents edit them, so unpublished work in another active worktree is accounted for.
 3. Verifies the issue's acceptance criteria and required checks, then opens one PR per issue (up to 3 related issues per PR) with a plain-English TL;DR. Incomplete verification is reported in a draft PR or as a blocker. It never merges or force-pushes.
-4. Uses one scheduled follow-up in the current Codex chat when the automation tool is available, with persisted findings and Codex retry times. Rechecks PR state before review fixes. In surfaces without scheduling, leaves an explicit handoff.
+4. Uses one scheduled follow-up in the current Codex chat when the automation tool is available, with persisted findings and separate code and security review statuses. Rechecks PR state before review fixes. In surfaces without scheduling, leaves an explicit handoff.
 5. Ends with PR links, skipped issues and reasons, remaining eligible issues, and watcher or handoff status.
 
 Requires authenticated `gh` access, Git worktrees, and Matt Pocock's [`pr`](https://github.com/mattpocock/skills) skill for the PR body template. Uses the repository's own service and test setup; no particular person's machine or private configuration is required. File reservations coordinate runs sharing a Git directory; other machines' work becomes visible through published PRs.
