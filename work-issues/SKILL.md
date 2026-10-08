@@ -1,6 +1,6 @@
 ---
 name: work-issues
-description: "Work a bounded batch of open GitHub issues into PRs, with isolated worktrees and CodeRabbit follow-up. Invoke with an issue budget or resume an existing run's review follow-up."
+description: "Work a bounded batch of open GitHub issues into PRs, with isolated worktrees and Codex follow-up. Invoke with an issue budget or resume an existing run's review follow-up."
 ---
 
 Work open GitHub issues in this repo that are unassigned or assigned to the authenticated GitHub user. Issues with any other assignee are out of scope.
@@ -67,14 +67,14 @@ Use Codex's available subagent tools when delegation helps. Keep implementation 
 
 ## Review loop
 
-CodeRabbit is the only reviewer. Catching its review is a core part of the run. Use one watcher rather than a polling subagent per PR:
+Codex is the only reviewer. Catching its review is a core part of the run. Use one watcher rather than a polling subagent per PR:
 
 1. **One watcher for this run.** As soon as the first PR opens, read [references/monitoring.md](references/monitoring.md) and start one supported background monitor over this run's PRs. Persist its state and rate-limit queue there. If the runtime cannot keep it alive after the response, hand over pending work with that state file; do not claim monitoring is active.
 2. **Route each finding to the agent that wrote the PR.** Use the available Codex subagent follow-up tool; an idle agent needs a call that starts another turn, not just a queued notification. If the agent is no longer available, continue in its recorded worktree. Before editing and again before pushing, re-read the PR's state and head commit. If it has merged or closed, stop and report the remaining finding rather than pushing to the old branch. Reconcile unexpected head changes before proceeding. Verify each finding; if real, fix it with regression coverage appropriate to the change, repeat the verification gate, push, reply on the thread, resolve it, and queue a review request for the new head. If wrong or out of scope, reply explaining why and leave the code alone. Report once.
-3. **Read the whole review.** CodeRabbit puts "outside diff range" and nitpick findings only in the review body, with no inline thread, so "0 unresolved threads" can hide a real finding. It can also post an approval seconds after posting findings, so an approval is not proof of no findings. Judge by the reviews on the head commit.
+3. **Read the whole review.** Read all Codex review bodies, inline findings, and completion responses. Zero unresolved threads alone does not prove that the head commit was reviewed. Record the reviewed head and completion evidence; if coverage is uncertain, keep the PR awaiting Codex.
 4. **A failed check is not automatically the PR's fault.** Read the job's log before acting (`gh api repos/<o>/<r>/actions/jobs/<id>/logs`). If logs are not yet available, record that and check on the next scheduled poll. Inspect the cause before rerunning failed or cancelled jobs. A known flaky test fixed on the target branch is solved by fetching and merging that branch into the PR branch (a merge, never a force-push).
 
-**Every PR needs a CodeRabbit review on its head commit.** No other reviewer substitutes for it; do not ask `@claude` or any other bot for a review. Request reviews one PR at a time using `@coderabbitai review`, with the persisted cooldown and deduplication procedure in the monitoring reference. A PR still unreviewed at the end of the run is listed as awaiting CodeRabbit.
+**Every PR needs a Codex review on its head commit.** No other reviewer substitutes for it; do not request CodeRabbit, Cursor, Claude, or another reviewer. Request reviews one PR at a time using `@codex review`, with the persisted cooldown and deduplication procedure in the monitoring reference. A PR still unreviewed at the end of the run is listed as awaiting Codex.
 
 ## Stop
 
@@ -83,8 +83,8 @@ Stop claiming when the budget is spent or no eligible issues remain. Finish each
 - PRs opened: link plus the issue numbers each closes.
 - Issues skipped or blocked, each with its reason.
 - Decisions waiting on the user that agents raised (behaviour changes, data cleanups, settings to confirm).
-- PRs still awaiting a CodeRabbit review (rate-limited or pending).
+- PRs still awaiting a Codex review (rate-limited or pending).
 - Count of eligible issues left for the next run, based on a complete refreshed inventory; if unavailable, state that the count is unknown.
 - Watcher status (active or handed over), the absolute run-state path, and any next retry time or remaining action.
 
-Keep the watcher running after the summary only when the runtime supports it. Otherwise hand over pending review work as described in the monitoring reference. Neither a summary nor a CodeRabbit approval authorizes merging.
+Keep the watcher running after the summary only when the runtime supports it. Otherwise hand over pending review work as described in the monitoring reference. Neither a summary nor a Codex approval authorizes merging.

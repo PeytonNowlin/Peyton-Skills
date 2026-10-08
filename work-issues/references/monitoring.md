@@ -22,12 +22,16 @@ Write state atomically through a temporary file in the same directory followed b
 
 Use a durable automation prompt with the actual repository and state-file path, such as:
 
-> Use $work-issues to continue review follow-up for `<owner/repo>` from `<absolute state-file path>`. Claim no new issues. Read the skill's monitoring reference, reconcile tracked PRs with GitHub, handle new findings in their recorded worktrees, and process due CodeRabbit requests. Stay quiet while nothing actionable changes; notify on meaningful changes, completion, failure, or required user action. Stop this heartbeat when every tracked PR is merged, closed, or explicitly handed over. Do not merge or force-push.
+> Use $work-issues to continue review follow-up for `<owner/repo>` from `<absolute state-file path>`. Claim no new issues. Read the skill's monitoring reference, reconcile tracked PRs with GitHub, handle new findings in their recorded worktrees, and process due Codex requests. Stay quiet while nothing actionable changes; notify on meaningful changes, completion, failure, or required user action. Stop this heartbeat when every tracked PR is merged, closed, or explicitly handed over. Do not merge or force-push.
 
 ## Review-request queue
 
-- Observe whether automatic CodeRabbit review arrives. Queue a manual request when review is absent, a fix changes the head, or CodeRabbit reports a review limit. Persist a supplied wait window as an absolute UTC `retryAfter`; if no retry time is supplied, report the blocker rather than repeatedly guessing and posting.
-- Request one PR at a time. Immediately before posting `@coderabbitai review`, confirm the PR is open, refresh its head and review coverage, and read the conversation for requests already posted. Drop requests already covered by a review on the current head; replace stale queued head SHAs with the current one and reassess whether review is needed.
+Use [Codex GitHub review](https://learn.chatgpt.com/docs/third-party/github). If Codex review is unavailable for the repository, record the setup or access blocker and hand it over. Do not substitute another reviewer.
+
+When resuming state created before the Codex-only policy, discard queued CodeRabbit requests and their cooldowns. Preserve outstanding findings, reassess Codex coverage on each current head, and update the existing heartbeat prompt to this policy before continuing.
+
+- Observe whether automatic Codex review arrives. Queue a manual request when review is absent, a fix changes the head, or Codex reports a review limit. Persist a supplied wait window as an absolute UTC `retryAfter`; if no retry time is supplied, report the blocker rather than repeatedly guessing and posting.
+- Request one PR at a time. Immediately before posting `@codex review`, confirm the PR is open, refresh its head and review coverage, and read the conversation for requests already posted. Drop requests already covered by a review on the current head; replace stale queued head SHAs with the current one and reassess whether review is needed.
 - Record the posted comment ID and wait for a response or the next scheduled observation. Never post another request for the same head while a previous request remains pending. If the response is a rate limit, keep the request queued until its supplied window passes, then retry once and record that request. A further limit updates the next retry time; it does not trigger a burst of comments.
 - A queued request becoming due is a meaningful event: the watcher must process it even if no new review or comment appeared. If a post's result is uncertain, read back the conversation before retrying. Resume only one watcher and one queue processor for a run.
 
