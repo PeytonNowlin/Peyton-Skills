@@ -1,6 +1,6 @@
 ---
 name: work-issues
-description: "Work a bounded batch of open GitHub issues into PRs, with isolated worktrees and Codex follow-up. Invoke with an issue budget or resume an existing run's review follow-up."
+description: "Work a bounded batch of open GitHub issues into PRs using strategic programming, isolated worktrees, and Codex follow-up. Invoke with an issue budget or resume an existing run's review follow-up."
 ---
 
 Work open GitHub issues in this repo that are unassigned or assigned to the authenticated GitHub user. Issues with any other assignee are out of scope.
@@ -8,6 +8,16 @@ Work open GitHub issues in this repo that are unassigned or assigned to the auth
 **In Claude Code**, read [references/claude-code.md](references/claude-code.md) before Prepare. It replaces the parts below that name Codex tools: budget, delegation, reviewers and monitoring.
 
 For a new batch, read the issue budget from the user's request, for example `$work-issues 3`. Require a positive integer; if missing or invalid, ask before claiming any issues. For an explicit request to resume review follow-up, load the supplied run-state file and continue the Review loop without claiming new issues or asking for a new budget.
+
+## Strategic programming
+
+Own the long-term health of the codebase while delivering the issue's acceptance criteria. Invest in design during implementation so future changes require less effort.
+
+- Before editing, understand the owning module, its callers, and the invariants the change must preserve. Verify the issue's proposed remedy against the code and put responsibility in the module that owns it.
+- Prefer cohesive modules with small interfaces that hide complexity. Consolidate repeated decisions and address the source of a problem rather than spreading special cases across callers.
+- Choose the smallest coherent change that preserves or improves the design. Judge simplicity by what the next maintainer must understand and change, not just the number of edited lines.
+- Tie structural improvements to the issue or a demonstrated obstacle to implementing it well. Keep unrelated cleanup and speculative abstractions out of the PR. Broader changes still follow file reservations and overlap checks.
+- When urgency requires a tactical shortcut, explain the constraint, the maintenance debt, and the concrete condition for revisiting it in the PR and handoff.
 
 ## Prepare
 
@@ -49,6 +59,7 @@ Use Codex's available subagent tools when delegation helps. Keep implementation 
 
 - The worktree path and branch, and "edit only this worktree".
 - The issue's acceptance criteria, relevant repository instructions, reserved files, and absolute paths to the reservation ledger and run state. Other agents may be working in the repository: preserve their changes and request ownership before editing additional files.
+- The absolute path to this skill, with an instruction to read and apply its Strategic programming section during implementation and review fixes.
 - The complete live overlap procedure above, with "run it before editing; if the fix needs a taken file, stop and report".
 - Required services, setup commands, and verification commands. Start the required services before dispatching when possible. If a service is stopped, try the documented startup procedure; if software, credentials, or a working environment are missing, report the specific blocker and the evidence still needed.
 - The actual body template loaded from the `pr` skill, preceded by the TL;DR requirement below, and the verification gate.
@@ -58,6 +69,7 @@ Use Codex's available subagent tools when delegation helps. Keep implementation 
 
 - Check the implemented behavior against the issue's acceptance criteria in its own worktree. For bug fixes, reproduce the failure when practical and add meaningful regression coverage when tests fit the change.
 - Run the repository's required checks and the tests relevant to the changed behavior. For visible UI changes, inspect the rendered result and capture a screenshot or clip for the PR.
+- Inspect the affected design for added coupling, duplicated decisions, and special cases. Simplify avoidable complexity within scope, and explain any material design tradeoff or remaining maintenance debt in the PR.
 - Open a ready-for-review PR only when the acceptance criteria are verified and required checks pass. If verification is blocked or fails, investigate the cause and record the exact limitation; use a draft PR with the missing evidence clearly stated, or report the issue as blocked. A check that was not run is not a pass.
 
 ## PR
@@ -72,7 +84,7 @@ Use Codex's available subagent tools when delegation helps. Keep implementation 
 Codex is the only reviewer. The repositories are configured to run Codex code review and security review automatically on every push. Monitor both reviews without posting manual review triggers. Use one watcher rather than a polling subagent per PR:
 
 1. **One watcher for this run.** As soon as the first PR opens, read [references/monitoring.md](references/monitoring.md) and start one supported background monitor over this run's PRs. Persist its state and the status of both automatic reviews there. If the runtime cannot keep it alive after the response, hand over pending work with that state file; do not claim monitoring is active.
-2. **Route each finding to the agent that wrote the PR.** Use the available Codex subagent follow-up tool; an idle agent needs a call that starts another turn, not just a queued notification. If the agent is no longer available, continue in its recorded worktree. Before editing and again before pushing, re-read the PR's state and head commit. If it has merged or closed, stop and report the remaining finding rather than pushing to the old branch. Reconcile unexpected head changes before proceeding. Verify each finding; if real, fix it with regression coverage appropriate to the change, repeat the verification gate, push, reply on the thread, resolve it, and wait for automatic code and security reviews on the new head. If wrong or out of scope, reply explaining why and leave the code alone. Answer a finding with the smallest fix that closes it: a new capability noticed while fixing is a follow-up issue, never part of this PR, because each added behaviour draws its own review round. Report once.
+2. **Route each finding to the agent that wrote the PR.** Use the available Codex subagent follow-up tool; an idle agent needs a call that starts another turn, not just a queued notification. If the agent is no longer available, continue in its recorded worktree. Before editing and again before pushing, re-read the PR's state and head commit. If it has merged or closed, stop and report the remaining finding rather than pushing to the old branch. Reconcile unexpected head changes before proceeding. Verify each finding; if real, fix it with regression coverage appropriate to the change, repeat the verification gate, push, reply on the thread, resolve it, and wait for automatic code and security reviews on the new head. If wrong or out of scope, reply explaining why and leave the code alone. Answer a finding with the smallest coherent fix that closes it under Strategic programming. A new capability noticed while fixing is a follow-up issue, never part of this PR, because each added behaviour draws its own review round. Report once.
 3. **Read the whole review.** Read all Codex code and security review bodies, inline findings, reports, and completion responses. Zero unresolved threads alone does not prove that the head commit was reviewed. Record the reviewed head and completion evidence separately for code review and security review; if coverage is uncertain, keep the PR awaiting Codex.
 4. **A failed check is not automatically the PR's fault.** Read the job's log before acting (`gh api repos/<o>/<r>/actions/jobs/<id>/logs`). If logs are not yet available, record that and check on the next scheduled poll. Inspect the cause before rerunning failed or cancelled jobs. A known flaky test fixed on the target branch is solved by fetching and merging that branch into the PR branch (a merge, never a force-push).
 

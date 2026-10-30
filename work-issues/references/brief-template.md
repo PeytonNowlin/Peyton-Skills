@@ -10,6 +10,8 @@ Repository: `<owner/repo>`; `gh` is authenticated as `<login>`. Edit only your w
 
 Read first: the repository's agent instructions (`<CLAUDE.md / AGENTS.md>`), its testing guide (`<path>`), and the issue in full including comments (`gh issue view <n> --comments`). An issue's suggested remedy is a direction; verify its claims against the code.
 
+Read and apply the Strategic programming section in `<absolute path to work-issues/SKILL.md>` during implementation and review fixes.
+
 Setup: `<setup command>`. Services: `<how to start them>`.
 
 ## Verification
@@ -37,7 +39,7 @@ Commit messages end with `<attribution lines>`. Push, open a ready PR against `<
 
 ## Review findings
 
-Answer a finding with the smallest fix that closes it, plus a test that fails on the current head. A new capability you notice while fixing goes in your report as a follow-up, outside this PR. Then:
+Answer a finding with the smallest coherent fix that closes it under Strategic programming, plus a test that fails on the current head. A new capability you notice while fixing goes in your report as a follow-up, outside this PR. Then:
 
 1. Re-read the PR state and head.
 2. Push without force.
