@@ -16,11 +16,11 @@ Setup: `<setup command>`. Services: `<how to start them>`.
 
 ## Verification
 
-Run locally: `<unit tests>`, `<static analysis>`, `<JS tests>`, `<lint>`, then `<pre-push hook command>` before the PR, with the hooks running. **The exit code is the verdict.** A summary line reading OK above a non-zero exit is a failure. Under heavy machine load, a timeout in a file your change never touched is load: re-run that file alone and report what you saw.
+Run locally: `<unit tests>`, `<static analysis>`, `<JS tests>`, `<lint>`, then `<pre-push hook command>` before the PR, with the hooks running. **The exit code is the verdict.** A summary line reading OK above a non-zero exit is a failure. For timeouts, inspect logs and reproduce in isolation before attributing the failure to machine load.
 
 `<repository-specific rules: browser tests off locally, line-ending traps, baseline files, ...>`
 
-A new test executes the code under test, and you show it fails with the fix reverted (`git show origin/<base>:<path>` restores the old file).
+When regression coverage fits the change, demonstrate failure before the fix and success after it using a disposable copy or a reversible patch; preserve all working changes.
 
 ## File ownership
 
@@ -35,7 +35,7 @@ When a fix needs a file outside your reservation, ask for it and wait for the gr
 
 ## Commit and PR
 
-Commit messages end with `<attribution lines>`. Push, open a ready PR against `<base>`, then `gh pr edit <n> --add-assignee @me`. The body opens with `## TL;DR` (2-4 plain sentences), then the `pr` skill template. Put each `Closes #N` on its own line as plain text. End the body with `<attribution lines>`. Merging and force-pushing stay with the user.
+Commit messages end with `<attribution lines>`. Repeat the full overlap check before pushing. Open or update the PR against `<base>`; keep it draft until the shared verification gate passes, then `gh pr edit <n> --add-assignee @me`. The body opens with `## TL;DR` (2-4 plain sentences), then the `pr` skill template. Put each `Closes #N` on its own line as plain text. End the body with `<attribution lines>`. Merging and force-pushing stay with the user.
 
 ## Review findings
 
@@ -44,14 +44,16 @@ Answer a finding with the smallest coherent fix that closes it under Strategic p
 1. Re-read the PR state and head.
 2. Push without force.
 3. Reply on the thread and resolve it.
-4. Post `Cursor review this`.
+4. Observe automatic Codex code and security reviews on the new head; follow the shared monitoring reference.
 
 ## Reporting
 
 Report at once for a blocker or a file request; otherwise report once at the end:
 
 - the PR URL;
-- per issue, what changed and how you verified it, including the revert proof;
+- per issue, what changed and how you verified it, including before/after evidence where practical;
 - suite totals;
 - what you deliberately left unfixed;
 - every decision the user must make.
+
+Stop and verify teardown of resources you started; preserve shared resources and evidence. Report any cleanup blocker.

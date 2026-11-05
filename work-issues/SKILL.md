@@ -5,7 +5,7 @@ description: "Work a bounded batch of open GitHub issues into PRs using strategi
 
 Work open GitHub issues in this repo that are unassigned or assigned to the authenticated GitHub user. Issues with any other assignee are out of scope.
 
-**In Claude Code**, read [references/claude-code.md](references/claude-code.md) before Prepare. It replaces the parts below that name Codex tools: budget, delegation, reviewers and monitoring.
+**In Claude Code**, read [references/claude-code.md](references/claude-code.md) before Prepare. It adapts delegation and observation tools only. Budget, ownership, verification, Codex-only reviews, and the no-merge policy below apply in every runtime.
 
 For a new batch, read the issue budget from the user's request, for example `$work-issues 3`. Require a positive integer; if missing or invalid, ask before claiming any issues. For an explicit request to resume review follow-up, load the supplied run-state file and continue the Review loop without claiming new issues or asking for a new budget.
 
@@ -22,8 +22,9 @@ Own the long-term health of the codebase while delivering the issue's acceptance
 ## Prepare
 
 - Read the repository's agent and setup instructions. Resolve its GitHub host, repository, authenticated login (`gh api user --jq .login`), and target branch. Use the documented target branch, otherwise the remote's default branch. For GitHub Enterprise, include `--hostname <host>` in every API command below.
+- Before claiming issues, verify authenticated repository access, Git/worktree support, the installed `pr` skill, and the documented verification commands and prerequisites. Resolve missing setup where authorized; otherwise record the blocker before spending budget. Read-only triage may continue.
 - Load the installed `pr` skill before claiming issues. Use this repository's services and verification commands; do not assume a particular person's machine, installed software, or credentials.
-- Store local coordination in `<git-common-dir>/work-issues/`, using the absolute path from `git rev-parse --path-format=absolute --git-common-dir`. Keep a shared `reservations.json` and a unique `<run-id>/state.json` for this run. Serialize coordination updates using an exclusive `coordination.lock` in that directory, releasing it after each update. These files stay outside tracked project files; store no credentials.
+- Store local coordination in `<git-common-dir>/work-issues/`, using the absolute path from `git rev-parse --path-format=absolute --git-common-dir`. Keep a shared `reservations.json` and a unique `<run-id>/state.json` for this run. Serialize coordination updates using an exclusive `coordination.lock` in that directory, releasing it after each update. These files stay outside tracked project files; store no credentials. Use `scripts/coord.py <file> <python using d>` for locked atomic updates; pass its explicit shared lock path as described in [the script reference](references/scripts.md). Record services and jobs started by this run, their ownership identifiers, and teardown commands.
 
 ## Select
 
@@ -35,12 +36,12 @@ Own the long-term health of the codebase while delivering the issue's acceptance
 
    Save the response in the run directory and process it only after the command succeeds. It is an array of page arrays: flatten the pages, then exclude entries with a `pull_request` field because this endpoint also returns PRs. If any page fails, report the incomplete inventory instead of selecting from it or reporting an exact remaining count.
 2. Filter to issues assigned only to the authenticated user or to no one. Order assigned issues first, then unassigned, oldest first within each group (`created_at`, then issue number).
-3. Read each candidate's body and dependencies. Skip issues labeled `blocked`, with an unresolved dependency, needing a human decision, already being addressed by an open PR, or reserved by another active run. Record the reason. Skipped issues cost no budget.
-4. Re-read the issue immediately before claiming; skip it if it has closed or gained another assignee. Claim with `gh issue edit <n> --add-assignee @me`, then verify its state and assignees. Record each successfully claimed issue once in the run state; that spends one unit of budget, including issues already assigned to the user. Stop claiming when the budget is spent, and finish the work already claimed.
+3. Read each candidate's body, all comments, linked dependencies, and associated PRs. Check the claims against the freshly fetched target branch. Record a short acceptance checklist with the expected behavior, owning module, and verification method. Distinguish unresolved product decisions from operator-only release steps: a release gate need not block implementation. Skip issues labeled `blocked`, with an unresolved dependency, needing a human decision, already being addressed by an open PR, or reserved by another active run. Record the reason. Skipped issues cost no budget.
+4. Re-read the issue immediately before claiming; skip it if it has closed or gained another assignee. Claim with `gh issue edit <n> --add-assignee @me`, then verify its state and assignees. If another claimant appears, stop before editing; assignment is not an atomic lock. Record each successfully claimed issue once in the run state; that spends one unit of budget, including issues already assigned to the user. Stop claiming when the budget is spent, and finish the work already claimed.
 
 ## Branch
 
-- Every branch starts from the freshly fetched target branch: `git fetch <remote> && git worktree add "../<repo>-<issue#>" -b <branch> <remote>/<base>`. Follow repository branch conventions. The current working tree stays untouched.
+- Every branch starts from the freshly fetched target branch: `git fetch <remote> && git worktree add "../<repo>-<issue#>" -b <branch> <remote>/<base>`. Follow repository branch conventions. Use the runtime’s worktree creation tool when available, otherwise the command above. The current working tree stays untouched.
 - One issue per PR by default. Up to 3 issues share a PR only when they touch the same feature or files and a reviewer would read them together.
 - Open PRs must not overlap: two PRs touching the same files, or one depending on the other, is a conflict. If issue B needs issue A merged first, finish A, stop, and record B as blocked.
 - Check overlap against every live open PR:
@@ -50,6 +51,7 @@ Own the long-term health of the codebase while delivering the issue's acceptance
   ```
 
   For each number, run `gh pr diff <n> --name-only`. Exclude only the PR for the branch currently being updated. If the listing or any diff fails, treat the overlap check as incomplete and resolve that before editing. Files named in an issue body are often context, not the fix, so investigate before skipping an apparent overlap.
+- Before implementation, publish a brief claim comment on the issue with the run ID, intended files, and acceptance checklist; inspect recent claims from teammates first. If ownership conflicts, record a blocker rather than racing. Open a draft PR as soon as a meaningful initial commit exists, stating the intended file scope. Comments and local reservations are advisory, not distributed locks. Repeat the complete overlap check immediately before every push; reconcile new conflicts before publishing.
 - Reserve planned files in `reservations.json` before editing or dispatching implementation. Record the run, issue, branch, worktree, worker, repository-relative file paths, and status. The orchestrator owns updates; concurrent local runs must serialize the check-and-reserve operation with an exclusive lock. Check both live PR files and reservations from other active worktrees before granting ownership. Workers may investigate read-only, but must request any additional files before editing them.
 - Keep reservations while work is active or its PR is open. Release them after verified merge, closure, or confirmed abandonment; a handoff retains ownership. Verify an old reservation's PR and worktree status before reclaiming it. Local reservations coordinate runs sharing this Git directory; work on another machine is visible only once published on GitHub.
 
@@ -76,7 +78,7 @@ Use Codex's available subagent tools when delegation helps. Keep implementation 
 
 - Write the body with the `pr` skill.
 - The first section of every body is **TL;DR**: 2 to 4 plain-English sentences a non-engineer can read. The `pr` template follows it.
-- Push the branch and open the PR. Merging and force-pushing are off the table for this skill.
+- Push the branch and open the PR, or update the existing draft and mark it ready only after the verification gate passes. Merging and force-pushing are off the table for this skill.
 - When Codex provides an artifact attachment tool, attach each created PR to the current task.
 
 ## Review loop
@@ -92,6 +94,8 @@ Codex is the only reviewer. The repositories are configured to run Codex code re
 
 ## Stop
 
+Before finishing or handing over, stop services, containers, watchers, and background jobs started by this run and verify they stopped. Preserve shared/pre-existing resources, saved evidence, data, volumes, branches, and worktrees. A monitor may remain only when explicitly authorized and supported by the runtime. Record cleanup failures as blockers.
+
 Stop claiming when the budget is spent or no eligible issues remain. Finish each claimed issue with a PR or a recorded blocker, then summarize:
 
 - PRs opened: link plus the issue numbers each closes.
@@ -101,4 +105,4 @@ Stop claiming when the budget is spent or no eligible issues remain. Finish each
 - Count of eligible issues left for the next run, based on a complete refreshed inventory; if unavailable, state that the count is unknown.
 - Watcher status (active or handed over), the absolute run-state path, and the next observation time or remaining action.
 
-Keep the watcher running after the summary only when the runtime supports it. Otherwise hand over pending review work as described in the monitoring reference. Neither a summary nor a Codex approval authorizes merging.
+Keep the watcher running after the summary only when explicitly authorized and the runtime supports it. Otherwise hand over pending review work as described in the monitoring reference. Neither a summary nor a Codex approval authorizes merging.
